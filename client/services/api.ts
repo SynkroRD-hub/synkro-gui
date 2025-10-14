@@ -8,15 +8,20 @@ export const api = axios.create({
 export interface UsuarioDTO {
   id: string;
   dni: string;
-  nombreCompleto: string;
+  nombres: string;
   apellidoPaterno: string;
   apellidoMaterno: string;
+  condicion: string;
+  correo: string;
+  cargo: string;
+  area: string;
 }
 
 export interface BienDTO {
   id: string;
   codigo_patrimonial: string;
-  descripcion: string;
+  codigo_interno: string;
+  descripcion_activo: string;
   marca: string;
   modelo: string;
   serie: string;
@@ -29,15 +34,58 @@ export interface BienDTO {
 
 export interface FichaDTO {
   id: string;
-  numero: string;
-  codigo: string;
+  numeroHoja: string;
+  dni: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  correo: string;
+  condicion: string;
+  obs?: string;
+  cargo: string;
+  inventariador: string;
+  inventariadorC?: string;
+  fecha: string; // ISO date
+  unidadOrganica: string;
+  area: string;
+  oficina: string;
+  versionPdf?: string;
+  observacion?: string;
+  impreso?: boolean;
+  status?: string;
 }
 
 export interface InventarioDetalleDTO {
   id: string;
-  fichaId: string;
-  ubicacion?: string;
-  bien: BienDTO;
+  idDetalle: string;
+  numeroFicha: string; // relates to Fichas.numeroHoja
+  status?: string;
+  codigo_patrimonial: string; // relates to Bienes.codigo_patrimonial
+  codigo_interno: string;
+  denominacion: string;
+  marca: string;
+  modelo: string;
+  serie: string;
+  placa: string;
+  tipo: string;
+  color?: string;
+  dimension?: string;
+  estado?: string;
+  situacion?: string;
+  codInt2023?: string;
+  observacion?: string;
+  cantidad: number;
+  dni: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  unidadOrganica: string;
+  area: string;
+  oficina: string;
+  cargo: string;
+  inventario?: string;
+  fecha: string; // ISO date
+  sede?: string;
 }
 
 // Example API calls: these endpoints are placeholders to integrate with your backend.
@@ -62,6 +110,7 @@ export const BienesAPI = {
     q?: string;
     sede?: string;
     area?: string;
+    oficina?: string;
   }) {
     const res = await api.get<BienDTO[]>("/bienes", { params });
     return res.data;
@@ -80,14 +129,14 @@ export const BienesAPI = {
 };
 
 export const FichasAPI = {
-  async list(params?: { page?: number; pageSize?: number }) {
+  async list(params?: { page?: number; pageSize?: number; from?: string; to?: string; unidadOrganica?: string; area?: string; oficina?: string; q?: string }) {
     const res = await api.get<FichaDTO[]>("/fichas", { params });
     return res.data;
   },
 };
 
 export const InventarioAPI = {
-  async listDetalle(params?: { fichaId?: string; ubicacion?: string }) {
+  async listDetalle(params?: { numeroFicha?: string; sede?: string; area?: string; oficina?: string; q?: string }) {
     const res = await api.get<InventarioDetalleDTO[]>("/inventario-detalle", {
       params,
     });

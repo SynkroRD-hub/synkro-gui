@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 const items = [
   { to: "/", label: "Inicio", icon: PackageSearch },
   { to: "/usuarios", label: "Usuarios", icon: Users2 },
-  { to: "/bienes", label: "Bienes", icon: Boxes },
   { to: "/fichas", label: "Fichas", icon: FileSpreadsheet },
-  { to: "/inventario", label: "Inventario", icon: PackageSearch },
+  { to: "/inventario", label: "Inventario_Detalle", icon: PackageSearch },
+  { to: "/bienes", label: "Bienes", icon: Boxes },
 ];
 
 export function Navbar() {
