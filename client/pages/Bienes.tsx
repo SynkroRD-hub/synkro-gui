@@ -7,42 +7,14 @@ import { DataTable, Column } from "@/components/table/DataTable";
 import { FloatingButton } from "@/components/common/FloatingButton";
 import { Download, Edit2, Trash2 } from "lucide-react";
 import { BienDTO, BienesAPI } from "@/services/api";
+import { downloadCSV, CsvColumn } from "@/lib/csv";
 
-function toCSV(rows: BienDTO[]): string {
-  const headers = [
-    "codigo_patrimonial",
-    "descripcion",
-    "marca",
-    "modelo",
-    "serie",
-    "placa",
-    "tipo",
-    "sede",
-    "area",
-    "oficina",
-  ];
-  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = [headers.join(","), ...rows.map((r) => headers.map((h) => esc((r as any)[h])).join(","))];
-  return lines.join("\n");
-}
-
-function downloadCSV(filename: string, rows: BienDTO[]) {
-  const blob = new Blob(["\uFEFF" + toCSV(rows)], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// Initial demo data for an immediate interactive UI. Replace with API results when backend is connected.
+// Demo data
 const DEMO_BIENES: BienDTO[] = Array.from({ length: 37 }).map((_, i) => ({
   id: String(i + 1),
   codigo_patrimonial: `CP-${String(1000 + i)}`,
-  descripcion: `Laptop corporativa ${i + 1}`,
+  codigo_interno: `CI-${String(500 + i)}`,
+  descripcion_activo: `Laptop corporativa ${i + 1}`,
   marca: ["Dell", "HP", "Lenovo"][i % 3],
   modelo: `M-${i + 10}`,
   serie: `SR-${i + 10000}`,
@@ -58,6 +30,7 @@ export default function BienesPage() {
   const [q, setQ] = useState("");
   const [sede, setSede] = useState<string>("all");
   const [area, setArea] = useState<string>("all");
+  const [oficina, setOficina] = useState<string>("all");
 
   useEffect(() => {
     (async () => {
@@ -65,7 +38,7 @@ export default function BienesPage() {
         const data = await BienesAPI.list();
         if (Array.isArray(data) && data.length) setRows(data);
       } catch (e) {
-        // If backend isn't ready, keep demo data.
+        // keep demo
       }
     })();
   }, []);
@@ -77,7 +50,8 @@ export default function BienesPage() {
         ? true
         : [
             r.codigo_patrimonial,
-            r.descripcion,
+            r.codigo_interno,
+            r.descripcion_activo,
             r.marca,
             r.modelo,
             r.serie,
@@ -91,24 +65,38 @@ export default function BienesPage() {
             .some((v) => String(v).toLowerCase().includes(term));
       const matchSede = sede === "all" || r.sede === sede;
       const matchArea = area === "all" || r.area === area;
-      return matchQ && matchSede && matchArea;
+      const matchOf = oficina === "all" || r.oficina === oficina;
+      return matchQ && matchSede && matchArea && matchOf;
     });
-  }, [rows, q, sede, area]);
+  }, [rows, q, sede, area, oficina]);
 
   const sedes = useMemo(() => Array.from(new Set(rows.map((r) => r.sede))).sort(), [rows]);
   const areas = useMemo(() => Array.from(new Set(rows.map((r) => r.area))).sort(), [rows]);
+  const oficinas = useMemo(() => Array.from(new Set(rows.map((r) => r.oficina))).sort(), [rows]);
 
   const columns: Column<BienDTO>[] = [
-    { key: "codigo_patrimonial", header: "Código", className: "min-w-[120px]" },
-    { key: "descripcion", header: "Descripción", className: "min-w-[220px]" },
+    { key: "codigo_patrimonial", header: "Código Patrimonial", className: "min-w-[140px]" },
+    { key: "codigo_interno", header: "Código Interno", className: "hidden md:table-cell" },
+    { key: "descripcion_activo", header: "Denominación", className: "min-w-[240px]" },
     { key: "marca", header: "Marca", className: "hidden md:table-cell" },
     { key: "modelo", header: "Modelo", className: "hidden lg:table-cell" },
     { key: "serie", header: "Serie", className: "hidden lg:table-cell" },
     { key: "placa", header: "Placa", className: "hidden xl:table-cell" },
     { key: "tipo", header: "Tipo", className: "hidden xl:table-cell" },
-    { key: "sede", header: "Sede", className: "hidden md:table-cell" },
-    { key: "area", header: "Área", className: "hidden lg:table-cell" },
-    { key: "oficina", header: "Oficina", className: "hidden xl:table-cell" },
+  ];
+
+  const csvCols: CsvColumn<BienDTO>[] = [
+    { key: "codigo_patrimonial", label: "Codigo Patrimonial" },
+    { key: "codigo_interno", label: "Codigo Interno" },
+    { key: "descripcion_activo", label: "Denominacion" },
+    { key: "marca", label: "Marca" },
+    { key: "modelo", label: "Modelo" },
+    { key: "serie", label: "Serie" },
+    { key: "placa", label: "Placa" },
+    { key: "tipo", label: "Tipo" },
+    { key: "sede", label: "Sede" },
+    { key: "area", label: "Area" },
+    { key: "oficina", label: "Oficina" },
   ];
 
   return (
@@ -116,56 +104,47 @@ export default function BienesPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Bienes</h1>
-          <p className="text-sm text-muted-foreground">Administra el catálogo de bienes patrimoniales.</p>
+          <p className="text-sm text-muted-foreground">Catálogo con filtros por Sede/Área/Oficina y exportación a Excel.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => downloadCSV("bienes", filtered)}>
+          <Button variant="outline" onClick={() => downloadCSV("bienes", csvCols, filtered)}>
             <Download className="mr-2 h-4 w-4" /> Exportar a Excel
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="sm:col-span-2">
-          <Label htmlFor="q" className="sr-only">
-            Buscar
-          </Label>
-          <Input
-            id="q"
-            placeholder="Buscar por código, descripción, marca..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="sm:col-span-2 lg:col-span-2">
+          <Label htmlFor="q" className="sr-only">Buscar</Label>
+          <Input id="q" placeholder="Buscar por código, denominación, marca..." value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div>
           <Label className="mb-1 block">Sede</Label>
           <Select value={sede} onValueChange={setSede}>
-            <SelectTrigger>
-              <SelectValue placeholder="Todas" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {sedes.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
+              {sedes.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label className="mb-1 block">Área</Label>
           <Select value={area} onValueChange={setArea}>
-            <SelectTrigger>
-              <SelectValue placeholder="Todas" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {areas.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {a}
-                </SelectItem>
-              ))}
+              {areas.map((a) => (<SelectItem key={a} value={a}>{a}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="mb-1 block">Oficina</Label>
+          <Select value={oficina} onValueChange={setOficina}>
+            <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {oficinas.map((o) => (<SelectItem key={o} value={o}>{o}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
@@ -176,10 +155,10 @@ export default function BienesPage() {
         columns={columns}
         actions={(row) => (
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => alert(`Editar ${row.descripcion}`)}>
+            <Button variant="outline" size="sm" onClick={() => alert(`Editar ${row.descripcion_activo}`)}>
               <Edit2 className="h-4 w-4" />
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => alert(`Borrar ${row.descripcion}`)}>
+            <Button variant="destructive" size="sm" onClick={() => alert(`Borrar ${row.descripcion_activo}`)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
